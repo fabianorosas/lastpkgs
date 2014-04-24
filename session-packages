@@ -1,0 +1,199 @@
+#!/bin/sh
+
+message() {
+  echo "usage:"  
+  echo
+  echo "  $0 -r"
+  echo "     remove explicitly installed packages"
+  echo
+  echo "  $0 -a"
+  echo "     list all packages installed since last reboot"
+  echo
+  echo "  $0 -l"
+  echo "     list only explicitly installed packages"
+  echo
+  exit 1
+}
+
+log=/var/log/pacman.log
+
+curr_session_pkgs=""
+pkgs_to_remove=""
+
+# Main functions
+#-------------------------------------------------------------------------------
+
+# Gets packages installed in the current session
+function fetchCurrSessionPkgs {
+    curr_session_timestamp=$(getCurrSessionTimestamp) # the start of the session
+    curr_session_first_day=$(extractDay $curr_session_timestamp)
+    time_since_session_start=$(getSecondsSinceEpoch $curr_session_timestamp)
+
+    echo -e "current session timestamp:\n$curr_session_timestamp"
+    echo
+    echo -e "time since session start:\n$time_since_session_start"
+    echo
+    echo -e "current session first day:\n$curr_session_first_day"
+    echo
+
+    # associative array in the format: [pkg]=timestamp_of_installation
+    eval declare -A \
+    pkgs_since_first_day=($(getPkgsSince $curr_session_first_day))
+
+    echo -e "pkgs since first day:\n${pkgs_since_first_day[@]}\n"
+
+    for pkg in ${!pkgs_since_first_day[@]}
+    do
+	time_since_pkg_install=$(getSecondsSinceEpoch ${pkgs_since_first_day[pkg]})
+
+	echo -e "time since pkg install:\n$time_since_pkg_install\n"
+
+	# filter out the packages installed in the first day that belong to the previous session:
+	if [ $time_since_pkg_install -gt $time_since_session_start ]
+	then
+	    curr_session_pkgs+=($pkg)
+	fi
+    done
+}
+
+# Lists all packages installed in the current session
+function listAllCurrSessionPkgs {
+    all_pkgs=(${curr_session_pkgs[@]})
+    for pkg in ${all_pkgs[@]}
+    do
+	echo $pkg
+    done
+}
+
+# Lists packages that were explicitly installed in the current session
+function listExplicitCurrSessionPkgs {
+    expl_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
+    for pkg in ${expl_pkgs[@]}
+    do
+	echo $pkg
+    done
+}
+
+# Iterate over the explicitly installed packages and asks which ones the user wants to remove
+function askWhichPkgsToRemove {
+    explicitly_installed_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null)) 
+
+    for new_pkg in ${explicitly_installed_pkgs[@]}
+    do
+	promptDeletion;
+
+	while [ "$remove_pkg" == "i" ]
+	do
+	    echo "";
+	    pacman -Qi $new_pkg;
+	    promptDeletion;
+	done
+
+	if [[ "$remove_pkg" == "" || "$remove_pkg" == "y" ]]
+	then
+	    pkgs_to_remove+=($new_pkg)
+	fi
+    done
+}
+
+# Remove the selected packages from the filesystem
+function removePkgs {
+    for rm_pkg in ${pkgs_to_remove[@]}
+    do
+	pacman --noconfirm -Rs $rm_pkg &>/dev/null
+    done
+}
+
+
+# Helper functions
+#-------------------------------------------------------------------------------
+
+function promptDeletion {
+    read -e -p "Remove $new_pkg?" -i "[Y/n/i] " ans;
+    cleanupAnswer "$ans"
+}
+
+function cleanupAnswer {
+    ans=$(echo $1 | tr -d [:space:])
+
+    if [ ${ans:0:7} == "[Y/n/i]" ]
+    then
+	remove_pkg=${ans:7}
+    else
+	remove_pkg=ans
+    fi
+}
+
+function getCurrSessionTimestamp {
+    echo $(last -1 -R --time-format iso reboot | head -1 | cut -d' ' -f7)
+}
+
+function getSecondsSinceEpoch {
+    if [ "$1" == "UTC" ]
+    then
+	echo $(date -u --date=$2 +%s)
+    else
+	echo $(date --date=$1 +%s)
+    fi
+}
+
+function extractDay {
+    echo $(echo $1 | cut -d'T' -f1)
+}
+
+# Greps pacman's log for packages installed since the start of the session
+# and returns them in an associative array as [pkg]=timestamp
+function getPkgsSince {
+    echo $(sed -n "/$1/,$ p" $log | grep "\[PACMAN\] installed" | 
+     # deleting unwanted info
+     sed 's/\[PACMAN\]\sinstalled\s//g' | 
+     sed 's/([a-zA-Z0-9.:-]*)//g' |
+     # formatting the timestamp as associative array declaration
+     sed 's/\(\[[0-9-]\{10\}\)\s\([0-9:]\{5\}\]\)\s/\1T\2=/g' | 
+     # [pkg]=timestamp
+     sed 's/\[\([^ ]*\)\]=\([^ ]*\)/[\2]=\1/g')
+}
+
+#-------------------------------------------------------------------------------
+[[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]] && message
+
+OPTIND=1
+OPTERR=0
+
+[ "$1" = "" ] && message
+
+while getopts "halr" opt;
+do
+    case "$opt" in
+	h)
+            message
+            exit 0
+            ;;
+	a)
+	    fetchCurrSessionPkgs
+	    listAllCurrSessionPkgs
+            exit 0
+            ;;
+	l)
+	    fetchCurrSessionPkgs
+	    listExplicitCurrSessionPkgs
+            exit 0
+            ;;
+	r)
+	    if [ `whoami` != root ]; then
+		echo The -r option requires root permissions.
+		exit
+	    fi
+	    fetchCurrSessionPkgs
+	    askWhichPkgsToRemove
+	    [ "$pkgs_to_remove" == "" ] && removePkgs
+            exit 0
+	    ;;
+	*)
+	    message
+            exit 0
+	    ;;
+    esac
+done
+
+message
