@@ -144,14 +144,10 @@ function extractDay {
 # Greps pacman's log for packages installed since the start of the session
 # and returns them in an associative array as [pkg]=timestamp
 function getPkgsSince {
-    echo $(sed -n "/$1/,$ p" $log | grep "\[PACMAN\] installed" | 
-     # deleting unwanted info
-     sed 's/\[PACMAN\]\sinstalled\s//g' | 
-     sed 's/([a-zA-Z0-9.:-]*)//g' |
-     # formatting the timestamp as associative array declaration
-     sed 's/\(\[[0-9-]\{10\}\)\s\([0-9:]\{5\}\]\)\s/\1T\2=/g' | 
-     # [pkg]=timestamp
-     sed 's/\[\([^ ]*\)\]=\([^ ]*\)/[\2]=\1/g')
+    #TODO:pass $1 to awk as a variable to replace the 2014-04-22 00:00 part
+    awk  '"[2014-04-22 00:00]" < $1$2 && $4 == "installed" {print "["$5"]="$1"T"$2}' $log |
+    sed 's/=\[/=/' |
+    sed 's/]$//'
 }
 
 #-------------------------------------------------------------------------------
