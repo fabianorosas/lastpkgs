@@ -20,15 +20,13 @@ log=/var/log/pacman.log
 declare -a curr_session_pkgs
 declare -a pkgs_to_remove
 
-# Main functions
-#-------------------------------------------------------------------------------
-
 function fetchCurrSessionPkgs {
     curr_session_start_time=$(getCurrSessionTimestamp)
     curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
 }
 
 function listCurrSessionPkgs {
+    # Check again to make sure the package wasn't deleted already
     if [ "$1" = "explicit" ]
     then
 	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
@@ -42,7 +40,6 @@ function listCurrSessionPkgs {
     done
 }
 
-# Iterate over the explicitly installed packages and asks which ones the user wants to remove
 function askWhichPkgsToRemove {
     explicitly_installed_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null)) 
 
@@ -64,16 +61,12 @@ function askWhichPkgsToRemove {
     done
 }
 
-# Remove the selected packages from the filesystem
 function removePkgs {
     for rm_pkg in ${pkgs_to_remove[@]}
     do
 	pacman --noconfirm -Rs $rm_pkg &>/dev/null
     done
 }
-
-# Helper functions
-#-------------------------------------------------------------------------------
 
 function promptDeletion {
     read -e -p "Remove $new_pkg?" -i "[Y/n/i] " ans;
@@ -95,7 +88,7 @@ function getCurrSessionTimestamp {
     echo $(last -1 -R --time-format iso reboot | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
 }
 
-# Greps pacman's log for packages installed since the start of the session
+# Searches pacman's log for packages installed since the start of the session
 function getPkgsSince {
     awk -v session_timestamp=$1 '"["session_timestamp"2014-04-22 00:00]" < $1" "$2 && $4 == "installed" {\
 print $5}' $log
