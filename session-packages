@@ -90,8 +90,8 @@ function getCurrSessionTimestamp {
 
 # Searches pacman's log for packages installed since the start of the session
 function getPkgsSince {
-    awk -v session_timestamp=$1 '"["session_timestamp"2014-04-22 00:00]" < $1" "$2 && $4 == "installed" {\
-print $5}' $log
+    awk -v session_timestamp=$1 '"["session_timestamp"]" < $1" "$2 && $4 == "installed" {\
+print $5}' $log | uniq
 }
 
 #-------------------------------------------------------------------------------
