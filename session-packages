@@ -23,25 +23,20 @@ declare -a pkgs_to_remove
 # Main functions
 #-------------------------------------------------------------------------------
 
-# Gets packages installed in the current session
 function fetchCurrSessionPkgs {
     curr_session_start_time=$(getCurrSessionTimestamp)
     curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
 }
 
-# Lists all packages installed in the current session
-function listAllCurrSessionPkgs {
-    all_pkgs=(${curr_session_pkgs[@]})
-    for pkg in ${all_pkgs[@]}
-    do
-	echo $pkg
-    done
-}
+function listCurrSessionPkgs {
+    if [ "$1" = "explicit" ]
+    then
+	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
+    else
+	pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
+    fi
 
-# Lists packages that were explicitly installed in the current session
-function listExplicitCurrSessionPkgs {
-    expl_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
-    for pkg in ${expl_pkgs[@]}
+    for pkg in ${pkgs[@]}
     do
 	echo $pkg
     done
@@ -76,7 +71,6 @@ function removePkgs {
 	pacman --noconfirm -Rs $rm_pkg &>/dev/null
     done
 }
-
 
 # Helper functions
 #-------------------------------------------------------------------------------
@@ -124,12 +118,12 @@ do
             ;;
 	a)
 	    fetchCurrSessionPkgs
-	    [ ${#curr_session_pkgs[@]} != 0 ] && listAllCurrSessionPkgs
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs
             exit 0
             ;;
 	l)
 	    fetchCurrSessionPkgs
-	    [ ${#curr_session_pkgs[@]} != 0 ] && listExplicitCurrSessionPkgs
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs explicit
             exit 0
             ;;
 	r)
