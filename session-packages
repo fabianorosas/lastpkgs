@@ -17,43 +17,16 @@ message() {
 
 log=/var/log/pacman.log
 
-pkgs_to_remove=""
+declare -a curr_session_pkgs
+declare -a pkgs_to_remove
 
 # Main functions
 #-------------------------------------------------------------------------------
 
 # Gets packages installed in the current session
 function fetchCurrSessionPkgs {
-    curr_session_timestamp=$(getCurrSessionTimestamp) # the start of the session
-    curr_session_first_day=$(extractDay $curr_session_timestamp)
-    time_since_session_start=$(getSecondsSinceEpoch $curr_session_timestamp)
-
-#    echo -e "current session timestamp:\n$curr_session_timestamp"
-#    echo
-#    echo -e "time since session start:\n$time_since_session_start"
-#    echo
-#    echo -e "current session first day:\n$curr_session_first_day"
-#    echo
-
-    # associative array in the format: [pkg]=timestamp_of_installation
-    eval declare -A \
-    pkgs_since_first_day=($(getPkgsSince $curr_session_first_day))
-
- #   echo -e "pkgs since first day #:\n${#pkgs_since_first_day[@]}\n"
-
-    for pkg in ${!pkgs_since_first_day[@]}
-    do
-	time_since_pkg_install=$(getSecondsSinceEpoch ${pkgs_since_first_day[pkg]})
-
-#	echo -e "time since pkg install:\n$time_since_pkg_install\n"
-
-	# filter out the packages installed in the first day that belong to the previous session:
-	if [ $time_since_pkg_install -gt $time_since_session_start ]
-	then
-	    curr_session_pkgs+=($pkg)
-	fi
-    done
-    echo ${#curr_session_pkgs[@]}
+    curr_session_start_time=$(getCurrSessionTimestamp)
+    curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
 }
 
 # Lists all packages installed in the current session
@@ -125,29 +98,13 @@ function cleanupAnswer {
 }
 
 function getCurrSessionTimestamp {
-    echo $(last -1 -R --time-format iso reboot | head -1 | cut -d' ' -f7)
-}
-
-function getSecondsSinceEpoch {
-    if [ "$1" == "UTC" ]
-    then
-	echo $(date -u --date=$2 +%s)
-    else
-	echo $(date --date=$1 +%s)
-    fi
-}
-
-function extractDay {
-    echo $(echo $1 | cut -d'T' -f1)
+    echo $(last -1 -R --time-format iso reboot | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
 }
 
 # Greps pacman's log for packages installed since the start of the session
-# and returns them in an associative array as [pkg]=timestamp
 function getPkgsSince {
-    #TODO:pass $1 to awk as a variable to replace the 2014-04-22 00:00 part
-    awk  '"[2014-04-22 00:00]" < $1$2 && $4 == "installed" {print "["$5"]="$1"T"$2}' $log |
-    sed 's/=\[/=/' |
-    sed 's/]$//'
+    awk -v session_timestamp=$1 '"["session_timestamp"2014-04-22 00:00]" < $1" "$2 && $4 == "installed" {\
+print $5}' $log
 }
 
 #-------------------------------------------------------------------------------
@@ -166,11 +123,13 @@ do
             exit 0
             ;;
 	a)
-	    [ $(fetchCurrSessionPkgs) == 0 ] || listAllCurrSessionPkgs
+	    fetchCurrSessionPkgs
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listAllCurrSessionPkgs
             exit 0
             ;;
 	l)
-	    [ $(fetchCurrSessionPkgs) == 0 ] || listExplicitCurrSessionPkgs
+	    fetchCurrSessionPkgs
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listExplicitCurrSessionPkgs
             exit 0
             ;;
 	r)
@@ -178,8 +137,9 @@ do
 		echo The -r option requires root permissions.
 		exit
 	    fi
-	    [ $(fetchCurrSessionPkgs) == 0 ] || askWhichPkgsToRemove
-	    [ "$pkgs_to_remove" == "" ] && removePkgs
+	    fetchCurrSessionPkgs
+	    askWhichPkgsToRemove
+	    [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
             exit 0
 	    ;;
 	*)
