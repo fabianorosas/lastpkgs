@@ -29,9 +29,9 @@ function listCurrSessionPkgs {
     # Check again to make sure the package wasn't deleted already
     if [ "$1" = "explicit" ]
     then
-	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
-    else
 	pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
+    else
+	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
     fi
 
     for pkg in ${pkgs[@]}
@@ -90,7 +90,7 @@ function getCurrSessionTimestamp {
 
 # Searches pacman's log for packages installed since the start of the session
 function getPkgsSince {
-    awk -v session_timestamp=$1 '"["session_timestamp"]" < $1" "$2 && $4 == "installed" {\
+    awk -v session_timestamp=$1 '"["session_timestamp < $1" "$2 && $4 == "installed" {\
 print $5}' $log | uniq
 }
 
