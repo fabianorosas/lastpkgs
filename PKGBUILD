@@ -9,16 +9,16 @@ license=('GPL')
 makedepends=('git')
 conflicts=('session-packages')
 provides=('session-packages')
-source=('git+https://github.com/fabianorosas/session-packages.git')
+source=("$pkgname"::'git+https://github.com/fabianorosas/session-packages.git')
 md5sums=('SKIP')
 
 pkgver() {
-	 cd "$srcdir/session-packages"
-	 git describe --long | sed -r 's/([^-]*-g)/r\1/;s/-/./g'
+  cd "$srcdir/$pkgname"
+  git describe --long | sed -r 's/([^-]*-g)/r\1/;s/-/./g'
 }
 
 package() {
-	  cd "$srcdir/session-packages"
-	  install -Dm755 "session-packages" "$pkgdir/usr/bin"
+  cd "$srcdir/$pkgname"
+  install -Dm755 session-packages $pkgdir/usr/bin/session-packages
 }
 
