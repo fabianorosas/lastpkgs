@@ -1,16 +1,17 @@
 #!/bin/sh
 
 message() {
-  echo "usage:"  
+  echo "Usage:"
+  echo "$0 (-r | -a | -l) [N]"
   echo
-  echo "  $0 -r"
-  echo "     remove explicitly installed packages"
+  echo "    -r  ::=  remove explicitly installed packages."
   echo
-  echo "  $0 -a"
-  echo "     list all packages installed since last reboot"
+  echo "    -a  ::=  list all packages installed"
   echo
-  echo "  $0 -l"
-  echo "     list only explicitly installed packages"
+  echo "    -l  ::=  list explicitly installed packages"
+  echo
+  echo "     N  ::=  fetch packages installed in the last N reboots"
+  echo "             0 means all past reboots"
   echo
   exit 1
 }
