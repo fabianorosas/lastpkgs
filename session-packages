@@ -21,7 +21,7 @@ declare -a curr_session_pkgs
 declare -a pkgs_to_remove
 
 function fetchCurrSessionPkgs {
-    curr_session_start_time=$(getCurrSessionTimestamp)
+    curr_session_start_time=$(getCurrSessionTimestamp "$1")
     curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
 }
 
@@ -85,7 +85,7 @@ function cleanupAnswer {
 }
 
 function getCurrSessionTimestamp {
-    echo $(last -1 -R --time-format iso reboot | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
+    echo $(last -"$1" -R --time-format iso reboot | tail -3 | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
 }
 
 # Searches pacman's log for packages installed since the start of the session
@@ -101,8 +101,16 @@ OPTIND=1
 OPTERR=0
 
 [ "$1" = "" ] && message
+case "$2" in
+    ''|*[!0-9]*)
+	N=1
+	;;
+    *) 
+	N="$2"
+	;;
+esac
 
-while getopts "halr" opt;
+while getopts "hadlr" opt;
 do
     case "$opt" in
 	h)
@@ -110,12 +118,12 @@ do
             exit 0
             ;;
 	a)
-	    fetchCurrSessionPkgs
+	    fetchCurrSessionPkgs "$N"
 	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs
             exit 0
             ;;
 	l)
-	    fetchCurrSessionPkgs
+	    fetchCurrSessionPkgs "$N"
 	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs explicit
             exit 0
             ;;
@@ -124,7 +132,7 @@ do
 		echo The -r option requires root permissions.
 		exit
 	    fi
-	    fetchCurrSessionPkgs
+	    fetchCurrSessionPkgs "$N"
 	    [ ${#curr_session_pkgs[@]} != 0 ] && askWhichPkgsToRemove && [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
             exit 0
 	    ;;
