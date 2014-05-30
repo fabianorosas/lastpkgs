@@ -125,8 +125,7 @@ do
 		exit
 	    fi
 	    fetchCurrSessionPkgs
-	    askWhichPkgsToRemove
-	    [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
+	    [ ${#curr_session_pkgs[@]} != 0 ] && askWhichPkgsToRemove && [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
             exit 0
 	    ;;
 	*)
