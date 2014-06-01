@@ -19,6 +19,6 @@ pkgver() {
 
 package() {
   cd "$srcdir/$pkgname"
-  install -Dm755 lastpkgs $pkgdir/usr/bin/rm-recent-pkgs
+  install -Dm755 lastpkgs $pkgdir/usr/bin/lastpkgs
 }
 
