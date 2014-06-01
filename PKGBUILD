@@ -6,6 +6,7 @@ pkgdesc="Lists or removes packages from the last N reboots. Good for cleaning up
 arch=('any')
 url="https://github.com/fabianorosas/lastpkgs"
 license=('GPL')
+depends=('bash')
 makedepends=('git')
 conflicts=('lastpkgs')
 provides=('lastpkgs')
