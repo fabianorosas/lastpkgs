@@ -1,15 +1,15 @@
 # Maintainer: Fabiano Rosas <fabianorosas@gmail.com>
-pkgname=session-packages-git
+pkgname=lastpkgs-git
 pkgver=0.0.0
 pkgrel=1
-pkgdesc="Lists and removes packages installed during the current session. Good for moments of package-installing frenzy."
+pkgdesc="Lists or removes packages from the last N reboots. Good for cleaning up after experimenting with new programs."
 arch=('any')
-url="https://github.com/fabianorosas/session-packages"
+url="https://github.com/fabianorosas/lastpkgs"
 license=('GPL')
 makedepends=('git')
-conflicts=('session-packages')
-provides=('session-packages')
-source=("$pkgname"::'git+https://github.com/fabianorosas/session-packages.git')
+conflicts=('lastpkgs')
+provides=('lastpkgs')
+source=("$pkgname"::'git+https://github.com/fabianorosas/lastpkgs.git')
 md5sums=('SKIP')
 
 pkgver() {
@@ -19,6 +19,6 @@ pkgver() {
 
 package() {
   cd "$srcdir/$pkgname"
-  install -Dm755 session-packages $pkgdir/usr/bin/session-packages
+  install -Dm755 lastpkgs $pkgdir/usr/bin/rm-recent-pkgs
 }
 

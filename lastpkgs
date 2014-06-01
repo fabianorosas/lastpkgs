@@ -1,0 +1,151 @@
+#!/bin/sh
+
+message() {
+  echo "Usage:"
+  echo "$0 (-r | -a | -l) [N]"
+  echo
+  echo "    -r  ::=  remove explicitly installed packages."
+  echo
+  echo "    -a  ::=  list all packages installed"
+  echo
+  echo "    -l  ::=  list explicitly installed packages"
+  echo
+  echo "     N  ::=  fetch packages installed in the last N reboots"
+  echo "             0 means all past reboots"
+  echo
+  exit 1
+}
+
+log=/var/log/pacman.log
+
+declare -a curr_session_pkgs
+declare -a pkgs_to_remove
+
+function fetchCurrSessionPkgs {
+    curr_session_start_time=$(getCurrSessionTimestamp "$1")
+    if [ "$current_session_start_time" = "" ]; then
+	echo "Couldn't get past reboots timestamp. Perhaps /var/log/wtmp was logrotated?" >&2
+	exit 1
+    fi
+    curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
+}
+
+function listCurrSessionPkgs {
+    # Check again to make sure the package wasn't deleted already
+    if [ "$1" = "explicit" ]
+    then
+	pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
+    else
+	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
+    fi
+
+    for pkg in ${pkgs[@]}
+    do
+	echo $pkg
+    done
+}
+
+function askWhichPkgsToRemove {
+    explicitly_installed_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null)) 
+
+    for new_pkg in ${explicitly_installed_pkgs[@]}
+    do
+	promptDeletion;
+
+	while [ "$remove_pkg" == "i" ]
+	do
+	    echo "";
+	    pacman -Qi $new_pkg;
+	    promptDeletion;
+	done
+
+	if [[ "$remove_pkg" == "" || "$remove_pkg" == "y" ]]
+	then
+	    pkgs_to_remove+=($new_pkg)
+	fi
+    done
+}
+
+function removePkgs {
+    for rm_pkg in ${pkgs_to_remove[@]}
+    do
+	pacman --noconfirm -Rs $rm_pkg &>/dev/null
+    done
+}
+
+function promptDeletion {
+    read -e -p "Remove $new_pkg?" -i "[Y/n/i] " ans;
+    cleanupAnswer "$ans"
+}
+
+function cleanupAnswer {
+    ans=$(echo $1 | tr -d [:space:])
+
+    if [ ${ans:0:7} == "[Y/n/i]" ]
+    then
+	remove_pkg=${ans:7}
+    else
+	remove_pkg=ans
+    fi
+}
+
+function getCurrSessionTimestamp {
+    echo $(last -"$1" -R --time-format iso reboot | tail -3 | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
+}
+
+# Searches pacman's log for packages installed since the start of the session
+function getPkgsSince {
+    awk -v session_timestamp=$1 '"["session_timestamp < $1" "$2 && $4 == "installed" {\
+print $5}' $log | sort | uniq
+}
+
+#-------------------------------------------------------------------------------
+[[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]] && message
+
+OPTIND=1
+OPTERR=0
+
+[ "$1" = "" ] && message
+case "$2" in
+    ''|*[!0-9]*)
+	N=1
+	;;
+    *) 
+	N="$2"
+	;;
+esac
+
+while getopts "hadlr" opt;
+do
+    case "$opt" in
+	h)
+            message
+            exit 0
+            ;;
+	a)
+	    fetchCurrSessionPkgs "$N"
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs
+            exit 0
+            ;;
+	l)
+	    fetchCurrSessionPkgs "$N"
+	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs explicit
+            exit 0
+            ;;
+	r)
+	    if [ `whoami` != root ]; then
+		echo The -r option requires root permissions.
+		exit
+	    fi
+	    fetchCurrSessionPkgs "$N"
+	    [ ${#curr_session_pkgs[@]} != 0 ] && askWhichPkgsToRemove && [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
+            exit 0
+	    ;;
+	*)
+	    message
+            exit 0
+	    ;;
+    esac
+done
+
+message
