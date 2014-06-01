@@ -1,7 +1,7 @@
 # Maintainer: Fabiano Rosas <fabianorosas@gmail.com>
 pkgname=lastpkgs-git
 pkgver=0.9.2
-pkgrel=1
+pkgrel=2
 pkgdesc="Lists or removes packages from the last N reboots. Good for cleaning up after experimenting with new programs."
 arch=('any')
 url="https://github.com/fabianorosas/lastpkgs"
