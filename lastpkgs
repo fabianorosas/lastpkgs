@@ -23,7 +23,7 @@ declare -a pkgs_to_remove
 
 function fetchCurrSessionPkgs {
     curr_session_start_time=$(getCurrSessionTimestamp "$1")
-    if [ "$current_session_start_time" = "" ]; then
+    if [[ $curr_session_start_time = "" ]]; then
 	echo "Couldn't get past reboots timestamp. Perhaps /var/log/wtmp was logrotated?" >&2
 	exit 1
     fi
