@@ -18,25 +18,25 @@ message() {
 
 log=/var/log/pacman.log
 
-declare -a curr_session_pkgs
+declare -a session_pkgs
 declare -a pkgs_to_remove
 
-function fetchCurrSessionPkgs {
-    curr_session_start_time=$(getCurrSessionTimestamp "$1")
-    if [[ $curr_session_start_time = "" ]]; then
-	echo "Couldn't get past reboots timestamp. Perhaps /var/log/wtmp was logrotated?" >&2
+function fetchSessionPkgs {
+    session_start_time=$(getSessionTimestamp "$1")
+    if [[ $session_start_time = "" ]]; then
+	echo -e "ERROR: Couldn't get past reboots timestamp.\n There is either no session $N or no /var/log/wtmp file" >&2
 	exit 1
     fi
-    curr_session_pkgs=($(getPkgsSince $curr_session_start_time))
+    session_pkgs=($(getPkgsSince $session_start_time))
 }
 
-function listCurrSessionPkgs {
+function listSessionPkgs {
     # Check again to make sure the package wasn't deleted already
     if [ "$1" = "explicit" ]
     then
-	pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null))
+	pkgs=($(pacman -Qqe ${session_pkgs[@]} 2>/dev/null))
     else
-	pkgs=($(pacman -Qq ${curr_session_pkgs[@]} 2>/dev/null))
+	pkgs=($(pacman -Qq ${session_pkgs[@]} 2>/dev/null))
     fi
 
     for pkg in ${pkgs[@]}
@@ -46,7 +46,7 @@ function listCurrSessionPkgs {
 }
 
 function askWhichPkgsToRemove {
-    explicitly_installed_pkgs=($(pacman -Qqe ${curr_session_pkgs[@]} 2>/dev/null)) 
+    explicitly_installed_pkgs=($(pacman -Qqe ${session_pkgs[@]} 2>/dev/null)) 
 
     for new_pkg in ${explicitly_installed_pkgs[@]}
     do
@@ -89,8 +89,11 @@ function cleanupAnswer {
     fi
 }
 
-function getCurrSessionTimestamp {
-    echo $(last -"$1" -R --time-format iso reboot | tail -3 | head -1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' ')
+function getSessionTimestamp {
+    for file in $(ls /var/log/wtmp* 2> /dev/null);
+    do
+	last --file $file -R --time-format iso reboot | head -n-2;
+    done | awk NR==$1 | cut -d' ' -f7 | cut -d: -f-2 | tr 'T' ' '
 }
 
 # Searches pacman's log for packages installed since the start of the session
@@ -123,13 +126,13 @@ do
             exit 0
             ;;
 	a)
-	    fetchCurrSessionPkgs "$N"
-	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs
+	    fetchSessionPkgs "$N"
+	    [ ${#session_pkgs[@]} != 0 ] && listSessionPkgs
             exit 0
             ;;
 	l)
-	    fetchCurrSessionPkgs "$N"
-	    [ ${#curr_session_pkgs[@]} != 0 ] && listCurrSessionPkgs explicit
+	    fetchSessionPkgs "$N"
+	    [ ${#session_pkgs[@]} != 0 ] && listSessionPkgs explicit
             exit 0
             ;;
 	r)
@@ -137,8 +140,8 @@ do
 		echo The -r option requires root permissions.
 		exit
 	    fi
-	    fetchCurrSessionPkgs "$N"
-	    [ ${#curr_session_pkgs[@]} != 0 ] && askWhichPkgsToRemove && [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
+	    fetchSessionPkgs "$N"
+	    [ ${#session_pkgs[@]} != 0 ] && askWhichPkgsToRemove && [ ${#pkgs_to_remove[@]} != 0 ] && removePkgs
             exit 0
 	    ;;
 	*)
